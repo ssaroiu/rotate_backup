@@ -1,40 +1,97 @@
 #!/bin/bash
 
-# This script rotates daily backup directories within a root backup directory. The backup directories rotated 
-# must encode timestamps in their names using MM-DD-YY format. Note that this script assumes you do not have more than
-# one backup directory with the same timestamp.
-#  
-# The rotation places these directories into a set of seven buckets as follows:
-# - 000-013--DAYS-AGO: stores all directories whose timestamps appear in the last 14 days including today
-# - 014-020--DAYS-AGO (2-3 weeks ago), 021-027-DAYS--AGO (3-4 weeks ago), 
-#   028-034--DAYS-AGO (4-5 weeks ago), 035-062--DAYS-AGO (5-9 weeks ago), 
-#   063-174--DAYS-AGO (9-25 weeks ago), 175-365--DAYS-AGO (25-52 weeks ago)
-# 
-# All older backups are deleted (USE AT YOUR OWN RISK!!!)
-#
-# This script must be run like this:
-#  ./rotate_backup.sh -b rootBackupDirName [-d]
+# MIT License
+
+# Copyright (c) 2018 Stefan Saroiu
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+## declare array of buckets
+declare -a buckets=(\
+   "$rootBackupDir/000-013--DAYS-AGO" \
+   "$rootBackupDir/014-020--DAYS-AGO" \
+   "$rootBackupDir/021-027--DAYS-AGO" \
+   "$rootBackupDir/028-034--DAYS-AGO" \
+   "$rootBackupDir/035-062--DAYS-AGO" \
+   "$rootBackupDir/063-174--DAYS-AGO" \
+   "$rootBackupDir/175-365--DAYS-AGO" \
+   )
 
 ## Simple usage routine
 usage() 
 { 
-  echo "Usage: ./rotate_backup.sh -b rootBackupDirName [-d]"
+  echo "Usage: ./rotate_backup.sh -b rootBackupDirName [-n]"
   echo 
-  echo "When a user creates daily backups, the following trade-off arises."
-  echo "On one hand, the old backups must be deleted to make room for more recent backups."
-  echo "On the other hand, it is a good idea to keep at least a few copies of old backups, just in case."
-  echo "This script places all backup directories in seven buckets, one storing all backups taken within"
-  echo "the last 14 days (including today), and six each storing one backup whose timestamp is the most"
-  echo "recent but not more than k weeks ago where k is 2, 3, 4, 8, 26, and 52."
-  echo 
-  echo "The backups are assumed to encode their timestamps into their names" 
-  echo "in the MM-DD-YY format."
-  echo 
-  echo "For example: BLDC_01-01-16_XXX encodes Jan 1st, 2016."
+  echo   -n: Shows a log of all actions. No actions are taken.
 } 
 
-## Routine that checks the existence of directories
-check_directories()
+# Parse the input and save the options passed in by the caller
+while getopts ":bn:" opt; do
+  case $opt in
+    b)
+      rootBackupDir=$OPTARG
+      ;;
+    b)
+      supress=true
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >& 2
+      exit 1
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      exit 1
+      ;;
+  esac
+done
+
+# Check that the root and backup subdirectories exist
+if ! [ "$supress" == true ] ; then
+  check_root_and_buckets_exist "$rootBackupDir"
+fi
+
+## Start moving files
+
+move_files_to_bucket 175 365 ${buckets[6]}
+move_files_to_bucket 63 174 ${buckets[5]}
+move_files_to_bucket 35 62  ${buckets[4]}
+move_files_to_bucket 28 34 ${buckets[3]}
+move_files_to_bucket 21 27 ${buckets[2]}
+move_files_to_bucket 14 20 ${buckets[1]}
+move_files_to_bucket 0 13 ${buckets[0]}
+
+## Prune the buckets (we don't prune 000-013)
+delete_all_but_oldest 175 365 ${buckets[6]}
+delete_all_but_oldest 63 174 ${buckets[5]}
+delete_all_but_oldest 35 62  ${buckets[4]}
+delete_all_but_oldest 28 34 ${buckets[3]}
+delete_all_but_oldest 21 27 ${buckets[2]}
+delete_all_but_oldest 14 20 ${buckets[1]}
+
+# End of main program. Only routines from this point onward.
+
+## Routine that checks 
+#
+#  1. The existence of root backup directory. If it doesn't exist, stop.
+#  2. The existence of buckets. Create them if they don't exist.
+#  
+check_root_and_buckets_exist()
 {
   if [ -z "$1" ]                           # Is parameter #1 zero length?
   then
@@ -45,14 +102,15 @@ check_directories()
   # Assign input parameters
   rootBackupDir=${1-$DEFAULT}          
 
-  # Check if the backup directories exist. Start witht the root backup
+  # Check if the backup directories exist. Start with the root backup
   if [ ! -d "$rootBackupDir" ]; then
     echo "Directory $rootBackupDir doesn't exist. Cannot continue."
     echo 
     usage
     exit
   fi
-  ## now loop through the above array and check if directories exist. Create them if they don't.
+  ## now loop through the buckets and check if they exist.
+  #  Create them if they don't.
   for i in "${buckets[@]}"
   do
     # First create the directory (-p only if it does not exist)
@@ -68,12 +126,11 @@ check_directories()
   done
 }
 
-## Routine that takes four parameters:
+## Routine that moves all relevant files to their corresponding bucket
+## Takes three parameters:
 ##   a start and an end date whose formats are MM-DD-YY,
 ##   a bucket name
-##   and a flag that says whether to keep oldest only and delete all others within the bucket 
-## The routine finds all directories whose names include MM-DD-YY and moves them to the buckets
-move_to_bucket()
+move_files_to_bucket()
 {
   if [ -z "$1" ]                           # Is parameter #1 zero length?
   then
@@ -93,7 +150,55 @@ move_to_bucket()
     exit
   fi
 
-  if [ -z "$4" ]                           # Is parameter #3 zero length?
+  # Assign input parameters
+  startDate=${1-$DEFAULT}          
+  endDate=${2-$DEFAULT}          
+  bucket=${3-$DEFAULT}
+
+  # For each MM-DD-YY between the start and end dates
+  for i in `seq $startDate 1 $endDate`;
+  do
+    # Generate a date of the form MM-DD-YY
+    iDate=$(date --date "$i days ago" +"%m-%d-%y")
+
+    # Check if any files whose names include iDate exist
+    # Unfortunately, the only way I know how to do that is by counting
+    c=$(find $rootBackupDir -path $bucket -prune -o -type d -name "*$iDate*" -print | wc -l)
+
+    # If any such files exist, gather their names (rerun the command), and move them
+    if [ $c -ne 0 ]; then
+      dirs=$(find $rootBackupDir -path $bucket -prune -o -type d -name "*$iDate*" -printf "%p ")
+
+      # Move the files
+      if [ "$supress" == true ] ; then
+        echo mv $dirs $bucket
+      else 
+        mv $dirs $bucket
+      fi    
+    fi
+  done
+}
+
+## Routine that deletes all files from a bucket except for the ones with the oldest
+#  timestamp
+## Takes three parameters:
+##   a start and an end date whose formats are MM-DD-YY,
+##   a bucket name
+delete_all_but_oldest()
+{
+  if [ -z "$1" ]                           # Is parameter #1 zero length?
+  then
+    echo "-Parameter #1 is zero length.-"  # Or no parameter passed.
+    exit
+  fi
+
+  if [ -z "$2" ]                           # Is parameter #2 zero length?
+  then
+    echo "-Parameter #2 is zero length.-"  # Or no parameter passed.
+    exit
+  fi
+  
+  if [ -z "$3" ]                           # Is parameter #3 zero length?
   then
     echo "-Parameter #3 is zero length.-"  # Or no parameter passed.
     exit
@@ -102,96 +207,34 @@ move_to_bucket()
   # Assign input parameters
   startDate=${1-$DEFAULT}          
   endDate=${2-$DEFAULT}          
-  bucketToMoveto=${3-$DEFAULT}
-  keepOldestOnly=${4-$DEFAULT}
+  bucket=${3-$DEFAULT}
 
-  # Go in reverse order by day
-  foundAny=false
-  for i in `seq $endDate -1 $startDate`;
+  # For each MM-DD-YY between the start and end dates and reverse chrono order
+  for i in `seq $startDate -1 $endDate`;
+  foundOldest=false
   do
-    # Generate a date of the form MM-DD-YY and call that 
-    # a directory name     
-    dateToSearchFor=$(date --date "$i days ago" +"%m-%d-%y")
-  
-    # Count how many backup directories with DirectoryName we have
-    c=$(find $rootBackupDir -path $bucketToMoveto -prune -o -type d -name "*$dateToSearchFor*" -print | wc -l)
+    # Generate a date of the form MM-DD-YY
+    iDate=$(date --date "$i days ago" +"%m-%d-%y")
 
-    # If any directories found, rerun the find command and place all directories found on a single line
-    # separated by spaces. Then move them.
+    # Check if any files whose names include iDate exist
+    # Unfortunately, the only way I know how to do that is by counting
+    c=$(find $rootBackupDir -path $bucket -prune -o -type d -name "*$iDate*" -print | wc -l)
+
+    # If any such files exist, check if they correspond to the oldest timestamp.
+    # If not, delete them
     if [ $c -ne 0 ]; then
-      dirs=$(find $rootBackupDir -path $bucketToMoveto -prune -o -type d -name "*$dateToSearchFor*" -printf "%p ")
-      if [ $foundAny == "false" ] || [ $keepOldestOnly == "false" ]; then
-        echo "Moving $dirs to $bucketToMoveto"
-        mv $dirs $bucketToMoveto
+      if [ $foundOldest == false ] ; then
+        foundOldest=true
       else
-        echo "Deleting $dirs"
-        rm -rf $dirs
-      fi
-      foundAny=true
+
+        dirs=$(find $rootBackupDir -path $bucket -prune -o -type d -name "*$iDate*" -printf "%p ")
+
+        # Delete the files
+        if ["$supress" == true] ; then
+          echo rm -rf $dirs
+        else 
+          rm -rf $dirs
+        fi    
     fi
   done
 }
-
-#
-# Start main code
-# 
-
-# The script accepts two input parameters -b and -r
-#  -b: root backup directory
-# Parse the input and save the options passed in by the caller
-while getopts ":b:" opt; do
-  case $opt in
-    b)
-      rootBackupDir=$OPTARG
-      ;;
-    \?)
-      echo "Invalid option: -$OPTARG" >& 2
-      exit 1
-      ;;
-    :)
-      echo "Option -$OPTARG requires an argument." >&2
-      exit 1
-      ;;
-  esac
-done
-
-## declare array of buckets
-declare -a buckets=(\
-   "$rootBackupDir/000-013--DAYS-AGO" \
-   "$rootBackupDir/014-020--DAYS-AGO" \
-   "$rootBackupDir/021-027--DAYS-AGO" \
-   "$rootBackupDir/028-034--DAYS-AGO" \
-   "$rootBackupDir/035-062--DAYS-AGO" \
-   "$rootBackupDir/063-174--DAYS-AGO" \
-   "$rootBackupDir/175-365--DAYS-AGO" \
-   )
-
-# Check that the backup directories exist
-check_directories "$rootBackupDir"
-
-# delete all backups older than one year -- up to 10 years ago
-mkdir "$rootBackupDir/TO_BE_DELETED"
-move_to_bucket 365 3650 "$rootBackupDir/TO_BE_DELETED" false
-rm -rf "$rootBackupDir/TO_BE_DELETED"
-
-# fifty two weeks ago: 175 - 365
-move_to_bucket 175 365 ${buckets[6]} true
-
-# twenty four weeks ago: 63 - 63+16*7-1
-move_to_bucket 63 174 ${buckets[5]} true
-
-# eight weeks ago: 35 - 62
-move_to_bucket 35 62  ${buckets[4]} true
-
-# four weeks ago: 28 - 34
-move_to_bucket 28 34 ${buckets[3]} true
-
-# three weeks ago: 21 - 27
-move_to_bucket 21 27 ${buckets[2]} true
-
-# two weeks ago: 14 - 20
-move_to_bucket 14 20 ${buckets[1]} true
-
-# 14 days: 0 - 13
-move_to_bucket 0 13 ${buckets[0]} false
-
