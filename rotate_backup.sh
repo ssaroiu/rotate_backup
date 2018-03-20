@@ -22,67 +22,95 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-## declare array of buckets
-declare -a buckets=(\
-   "$rootBackupDir/000-013--DAYS-AGO" \
-   "$rootBackupDir/014-020--DAYS-AGO" \
-   "$rootBackupDir/021-027--DAYS-AGO" \
-   "$rootBackupDir/028-034--DAYS-AGO" \
-   "$rootBackupDir/035-062--DAYS-AGO" \
-   "$rootBackupDir/063-174--DAYS-AGO" \
-   "$rootBackupDir/175-365--DAYS-AGO" \
+## declare array of bucket names
+declare -a bucketNames=(\
+   "000-013--DAYS-AGO" \
+   "014-020--DAYS-AGO" \
+   "021-027--DAYS-AGO" \
+   "028-034--DAYS-AGO" \
+   "035-062--DAYS-AGO" \
+   "063-174--DAYS-AGO" \
+   "175-365--DAYS-AGO" \
    )
 
 ## Simple usage routine
-usage() 
+function usage() 
 { 
-  echo "Usage: ./rotate_backup.sh -b rootBackupDirName [-n]"
-  echo 
-  echo   -n: Shows a log of all actions. No actions are taken.
+  echo
+  echo "Usage: ./rotate_backup.sh -b rootBackupDir [-n]"
+  echo  "   -n: Shows a log of all actions. No actions are taken."
+  echo  "   -v: Verbose mode."
 } 
 
-# Parse the input and save the options passed in by the caller
-while getopts ":bn:" opt; do
-  case $opt in
-    b)
-      rootBackupDir=$OPTARG
-      ;;
-    b)
-      supress=true
-      ;;
-    \?)
-      echo "Invalid option: -$OPTARG" >& 2
-      exit 1
-      ;;
-    :)
-      echo "Option -$OPTARG requires an argument." >&2
-      exit 1
-      ;;
-  esac
-done
+# Main program
+function main() {
 
-# Check that the root and backup subdirectories exist
-if ! [ "$supress" == true ] ; then
-  check_root_and_buckets_exist "$rootBackupDir"
-fi
+  # Parse the input and save the options passed in by the caller
+  while getopts ":b:nv" opt; do
+    case $opt in
+      b)
+        rootBackupDir=$OPTARG
+        ;;
+      n)
+        supress=true
+        ;;
+      v)
+        verbose=true
+        ;;
+      \?)
+        echo "Invalid option: -$OPTARG" >& 2
+        usage
+        exit 1
+        ;;
+      :)
+        echo "Option -$OPTARG requires an argument." >&2
+        usage
+        exit 1
+        ;;
+    esac
+  done
 
-## Start moving files
+  if [ -z "$rootBackupDir" ]
+  then
+    echo "rootBackupDir must be declared."  # Or no parameter passed.
+    usage
+    exit 1
+  fi
 
-move_files_to_bucket 175 365 ${buckets[6]}
-move_files_to_bucket 63 174 ${buckets[5]}
-move_files_to_bucket 35 62  ${buckets[4]}
-move_files_to_bucket 28 34 ${buckets[3]}
-move_files_to_bucket 21 27 ${buckets[2]}
-move_files_to_bucket 14 20 ${buckets[1]}
-move_files_to_bucket 0 13 ${buckets[0]}
+  # Check that the root and backup subdirectories exist
+  if ! [ "$supress" == true ] ; then
+    __check_root_and_buckets_exist "$rootBackupDir"
+  fi
 
-## Prune the buckets (we don't prune 000-013)
-delete_all_but_oldest 175 365 ${buckets[6]}
-delete_all_but_oldest 63 174 ${buckets[5]}
-delete_all_but_oldest 35 62  ${buckets[4]}
-delete_all_but_oldest 28 34 ${buckets[3]}
-delete_all_but_oldest 21 27 ${buckets[2]}
-delete_all_but_oldest 14 20 ${buckets[1]}
+  ## Start moving dirs
+  if [ "$verbose" ==  true ]; then
+    echo Start moving dirs...
+  fi
+  __move_dirs_to_bucket 175 365 $rootBackupDir/${bucketNames[6]}
+  __move_dirs_to_bucket 63 174 $rootBackupDir/${bucketNames[5]}
+  __move_dirs_to_bucket 35 62  $rootBackupDir/${bucketNames[4]}
+  __move_dirs_to_bucket 28 34 $rootBackupDir/${bucketNames[3]}
+  __move_dirs_to_bucket 21 27 $rootBackupDir/${bucketNames[2]}
+  __move_dirs_to_bucket 14 20 $rootBackupDir/${bucketNames[1]}
+  __move_dirs_to_bucket 0 13 $rootBackupDir/${bucketNames[0]}
+  if [ "$verbose" ==  true ]; then
+    echo Moving done.
+  fi
+
+  ## Prune the buckets (we don't prune 000-013)
+  if [ "$verbose" ==  true ]; then
+    echo Start pruning dirs...
+  fi
+  __delete_all_but_oldest 175 365 $rootBackupDir/${bucketNames[6]}
+  __delete_all_but_oldest 63 174 $rootBackupDir/${bucketNames[5]}
+  __delete_all_but_oldest 35 62  $rootBackupDir/${bucketNames[4]}
+  __delete_all_but_oldest 28 34 $rootBackupDir/${bucketNames[3]}
+  __delete_all_but_oldest 21 27 $rootBackupDir/${bucketNames[2]}
+  __delete_all_but_oldest 14 20 $rootBackupDir/${bucketNames[1]}
+  if [ "$verbose" ==  true ]; then
+    echo Pruning done.
+  fi
+}
 
 # End of main program. Only routines from this point onward.
 
@@ -91,46 +119,73 @@ delete_all_but_oldest 14 20 ${buckets[1]}
 #  1. The existence of root backup directory. If it doesn't exist, stop.
 #  2. The existence of buckets. Create them if they don't exist.
 #  
-check_root_and_buckets_exist()
+function __check_root_and_buckets_exist()
 {
   if [ -z "$1" ]                           # Is parameter #1 zero length?
   then
     echo "-Parameter #1 is zero length.-"  # Or no parameter passed.
-    exit
+    usage
+    exit 1
   fi
 
   # Assign input parameters
   rootBackupDir=${1-$DEFAULT}          
 
+  if [ "$verbose" ==  true ]; then
+    echo Checking if rootBackup dir exists...
+  fi
+
   # Check if the backup directories exist. Start with the root backup
   if [ ! -d "$rootBackupDir" ]; then
-    echo "Directory $rootBackupDir doesn't exist. Cannot continue."
-    echo 
+    echo "Directory \"$rootBackupDir\" (rootBackupDir) doesn't exist. Cannot continue."
     usage
-    exit
+    exit 1
   fi
+
+  if [ "$verbose" ==  true ]; then
+    echo Checked.
+  fi
+
   ## now loop through the buckets and check if they exist.
   #  Create them if they don't.
-  for i in "${buckets[@]}"
+  for i in "${bucketNames[@]}"
   do
+
+    if [ "$verbose" ==  true ]; then
+      echo Creating directory $rootBackupDir/$i...
+    fi
+
     # First create the directory (-p only if it does not exist)
-    mkdir -p $i
-    
+    mkdir -p $rootBackupDir/$i
+
     # If directory still not there, exit
-    if [ ! -d $i ]; then
+    if [ ! -d $rootBackupDir/$i ]; then
       echo "Bucket $i doesn't exist. Cannot continue."
       echo 
       usage
       exit
     fi
+
+    if [ "$verbose" ==  true ]; then
+      echo Done.
+    fi
   done
 }
 
-## Routine that moves all relevant files to their corresponding bucket
+## Routine that moves a set of relevant dirs to their corresponding bucket
+## The set of relevant dirs are all dirs whose names contain timestamps
+## found between two landmarks: [older_than_n_days_ago; yonger_than_n_days_ago]
+## Note: the landmarks are inclusive
+##
+## e.g., __move_dirs_to_bucket 1 2 _bucketName_
+## moves all dirs from yesterday and the day before yesterday to bucket         
+##
+##  
 ## Takes three parameters:
-##   a start and an end date whose formats are MM-DD-YY,
+##   older_than_n_days_ago
+##   younger_than_n_days ago
 ##   a bucket name
-move_files_to_bucket()
+function __move_dirs_to_bucket_and_prune()
 {
   if [ -z "$1" ]                           # Is parameter #1 zero length?
   then
@@ -151,40 +206,58 @@ move_files_to_bucket()
   fi
 
   # Assign input parameters
-  startDate=${1-$DEFAULT}          
-  endDate=${2-$DEFAULT}          
-  bucket=${3-$DEFAULT}
+  local olderThanN=${1-$DEFAULT}          
+  local youngerThanN=${2-$DEFAULT}          
+  local bucket=${3-$DEFAULT}
 
-  # For each MM-DD-YY between the start and end dates
-  for i in `seq $startDate 1 $endDate`;
+  # For each MM-DD-YY between the end and start dates in reverse chrono order
+  for i in `seq $youngerThanN -1 $olderThanN`;
   do
     # Generate a date of the form MM-DD-YY
     iDate=$(date --date "$i days ago" +"%m-%d-%y")
 
-    # Check if any files whose names include iDate exist
+    if [ "$verbose" ==  true ]; then
+      echo Checking how many dirs matching date $iDate in $rootBackup exist...
+    fi
+
+    # Check if any dirs whose names include iDate exist
     # Unfortunately, the only way I know how to do that is by counting
-    c=$(find $rootBackupDir -path $bucket -prune -o -type d -name "*$iDate*" -print | wc -l)
+    local c=$( (find $rootBackupDir -path $bucket -prune -o -type d -name "*$iDate*" -print) 2>/dev/null | wc -l)
 
-    # If any such files exist, gather their names (rerun the command), and move them
+    if [ "$verbose" ==  true ]; then
+      echo Found $c.
+    fi
+
+    # If any such dirs exist, gather their names (rerun the command), and move them
     if [ $c -ne 0 ]; then
-      dirs=$(find $rootBackupDir -path $bucket -prune -o -type d -name "*$iDate*" -printf "%p ")
+      local dirs=$(find $rootBackupDir -path $bucket -prune -o -type d -name "*$iDate*" -printf "%p ")
 
-      # Move the files
+      if [ "$verbose" ==  true ]; then
+        echo Moving all dirs to bucket $bucket...
+      fi
+
+      # Move the dirs
       if [ "$supress" == true ] ; then
         echo mv $dirs $bucket
       else 
         mv $dirs $bucket
       fi    
+
+      if [ "$verbose" ==  true ]; then
+        echo Moved.
+      fi
     fi
+
+
   done
 }
 
-## Routine that deletes all files from a bucket except for the ones with the oldest
+## Routine that deletes all dirs from a bucket except for the ones with the oldest
 #  timestamp
-## Takes three parameters:
-##   a start and an end date whose formats are MM-DD-YY,
-##   a bucket name
-delete_all_but_oldest()
+## Takes two parameters:
+##   older_than_n_days_ago
+##   younger_than_n_days ago
+function __delete_all_but_oldest()
 {
   if [ -z "$1" ]                           # Is parameter #1 zero length?
   then
@@ -198,43 +271,59 @@ delete_all_but_oldest()
     exit
   fi
   
-  if [ -z "$3" ]                           # Is parameter #3 zero length?
-  then
-    echo "-Parameter #3 is zero length.-"  # Or no parameter passed.
-    exit
-  fi
-
   # Assign input parameters
-  startDate=${1-$DEFAULT}          
-  endDate=${2-$DEFAULT}          
-  bucket=${3-$DEFAULT}
+  local olderThanN=${1-$DEFAULT}          
+  local youngerThanN=${2-$DEFAULT}           
 
   # For each MM-DD-YY between the start and end dates and reverse chrono order
-  for i in `seq $startDate -1 $endDate`;
-  foundOldest=false
+  local foundOldest=false
+  for i in `seq $youngerThanN -1 $olderThanN`;
   do
     # Generate a date of the form MM-DD-YY
     iDate=$(date --date "$i days ago" +"%m-%d-%y")
 
-    # Check if any files whose names include iDate exist
-    # Unfortunately, the only way I know how to do that is by counting
-    c=$(find $rootBackupDir -path $bucket -prune -o -type d -name "*$iDate*" -print | wc -l)
+    if [ "$verbose" ==  true ]; then
+      echo Checking how many dirs matching date $iDate in $rootBackup exist...
+    fi
 
-    # If any such files exist, check if they correspond to the oldest timestamp.
+    # Check if any dirs whose names include iDate exist
+    # Unfortunately, the only way I know how to do that is by counting
+    local c=$( (find $rootBackupDir -type d -name "*$iDate*" -print) 2>/dev/null | wc -l)
+
+    if [ "$verbose" ==  true ]; then
+      echo Found $c.
+    fi
+
+    # If any such dirs exist, check if they correspond to the oldest timestamp.
     # If not, delete them
     if [ $c -ne 0 ]; then
       if [ $foundOldest == false ] ; then
+        if [ "$verbose" ==  true ]; then
+          echo Oldest dir between [$olderThanN; $youngerThanN] is from $iDate. Not pruned.
+        fi
+
         foundOldest=true
       else
 
-        dirs=$(find $rootBackupDir -path $bucket -prune -o -type d -name "*$iDate*" -printf "%p ")
+        local dirs=$( (find $rootBackupDir -type d -name "*$iDate*" -printf "%p ") 2>/dev/null )
 
-        # Delete the files
+        if [ "$verbose" ==  true ]; then
+          echo Pruning $dirs...
+        fi
+
+        # Delete the dirs
         if ["$supress" == true] ; then
           echo rm -rf $dirs
         else 
           rm -rf $dirs
         fi    
+
+        if [ "$verbose" ==  true ]; then
+          echo Pruned.
+        fi
+      fi
     fi
   done
 }
+
+main "$@"
