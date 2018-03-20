@@ -185,7 +185,7 @@ function __check_root_and_buckets_exist()
 ##   older_than_n_days_ago
 ##   younger_than_n_days ago
 ##   a bucket name
-function __move_dirs_to_bucket_and_prune()
+function __move_dirs_to_bucket()
 {
   if [ -z "$1" ]                           # Is parameter #1 zero length?
   then
