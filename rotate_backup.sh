@@ -312,7 +312,7 @@ function __delete_all_but_oldest()
         fi
 
         # Delete the dirs
-        if ["$supress" == true] ; then
+        if [ "$supress" == true ]; then
           echo rm -rf $dirs
         else 
           rm -rf $dirs
