@@ -34,6 +34,8 @@ fi
 # Cleanup all test files
 rm -rf $rootBackupDir
 
+echo Test with a single directory with today\'s date passed.
+
 #
 # Test with a directory for each of the past 365 days
 #
@@ -73,6 +75,8 @@ fi
 
 # Cleanup all test files
 rm -rf $rootBackupDir
+
+echo Test with a directory for each of the past 365 days passed.
 
 #
 # Test with a directory for each of the 1 through 366 days ago.
@@ -114,6 +118,8 @@ fi
 
 # Cleanup all test files
 rm -rf $rootBackupDir
+
+echo Test with a directory for each of the 1 through 366 days ago passed.
 
 #
 # Test with three directories 173, 174, and 175 days ago
@@ -162,5 +168,6 @@ fi
 # Cleanup all test files
 rm -rf $rootBackupDir
 
+echo Test with three directories 173, 174, and 175 days ago passed.
 
-echo Tests pass.
+echo All tests pass.
