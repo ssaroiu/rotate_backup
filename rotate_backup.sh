@@ -37,7 +37,8 @@ declare -a bucketNames=(\
 function usage() 
 { 
   echo
-  echo "Usage: ./rotate_backup.sh -b rootBackupDir [-n]"
+  echo "Usage: ./rotate_backup.sh -b rootBackupDir [-p] [-n] [-v]"
+  echo  "   -p: Prune buckets. (leave newest dir in each bucket, except 000-014 bucket)"
   echo  "   -n: Shows a log of all actions. No actions are taken."
   echo  "   -v: Verbose mode."
 } 
@@ -46,13 +47,16 @@ function usage()
 function main() {
 
   # Parse the input and save the options passed in by the caller
-  while getopts ":b:nv" opt; do
+  while getopts ":b:nvp" opt; do
     case $opt in
       b)
         rootBackupDir=$OPTARG
         ;;
       n)
         supress=true
+        ;;
+      p)
+        prune=true
         ;;
       v)
         verbose=true
@@ -98,17 +102,19 @@ function main() {
   fi
 
   ## Prune the buckets (we don't prune 000-013)
-  if [ "$verbose" ==  true ]; then
-    echo Start pruning dirs...
-  fi
-  __delete_all_but_oldest 175 365 $rootBackupDir/${bucketNames[6]}
-  __delete_all_but_oldest 63 174 $rootBackupDir/${bucketNames[5]}
-  __delete_all_but_oldest 35 62  $rootBackupDir/${bucketNames[4]}
-  __delete_all_but_oldest 28 34 $rootBackupDir/${bucketNames[3]}
-  __delete_all_but_oldest 21 27 $rootBackupDir/${bucketNames[2]}
-  __delete_all_but_oldest 14 20 $rootBackupDir/${bucketNames[1]}
-  if [ "$verbose" ==  true ]; then
-    echo Pruning done.
+  if [ "$prune" == true ]; then
+    if [ "$verbose" ==  true ]; then
+      echo Start pruning dirs...
+    fi
+    __delete_all_but_oldest 175 365 $rootBackupDir/${bucketNames[6]}
+    __delete_all_but_oldest 63 174 $rootBackupDir/${bucketNames[5]}
+    __delete_all_but_oldest 35 62  $rootBackupDir/${bucketNames[4]}
+    __delete_all_but_oldest 28 34 $rootBackupDir/${bucketNames[3]}
+    __delete_all_but_oldest 21 27 $rootBackupDir/${bucketNames[2]}
+    __delete_all_but_oldest 14 20 $rootBackupDir/${bucketNames[1]}
+    if [ "$verbose" ==  true ]; then
+      echo Pruning done.
+    fi
   fi
 }
 

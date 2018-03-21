@@ -138,14 +138,14 @@ done
 ./rotate_backup.sh -b $rootBackupDir
 
 # Check that 000-013 has 0 directories in it
-c=$( ls -d $rootBackupDir/000-013--DAYS-AGO/* | wc -l)
+c=$( ( ls -d $rootBackupDir/000-013--DAYS-AGO/* ) 2>/dev/null | wc -l)
 if [ $c != 0 ]; then
   echo Test failed. Directory 000-013--DAYS-AGO should have 0 subdirectories inside of it.
   exit 1
 fi
 
 # Check that 014-020 has 0 directories in it
-c=$( ls -d $rootBackupDir/014-020--DAYS-AGO/* | wc -l)
+c=$( ( ls -d $rootBackupDir/014-020--DAYS-AGO/* ) 2>/dev/null | wc -l)
 if [ $c != 0 ]; then
   echo Test failed. Directory 014-020--DAYS-AGO should have 0 subdirectory inside of it.
   exit 1
