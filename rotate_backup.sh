@@ -106,12 +106,12 @@ function main() {
     if [ "$verbose" ==  true ]; then
       echo Start pruning dirs...
     fi
-    __delete_all_but_oldest 175 365 $rootBackupDir/${bucketNames[6]}
-    __delete_all_but_oldest 63 174 $rootBackupDir/${bucketNames[5]}
-    __delete_all_but_oldest 35 62  $rootBackupDir/${bucketNames[4]}
-    __delete_all_but_oldest 28 34 $rootBackupDir/${bucketNames[3]}
-    __delete_all_but_oldest 21 27 $rootBackupDir/${bucketNames[2]}
-    __delete_all_but_oldest 14 20 $rootBackupDir/${bucketNames[1]}
+    __delete_all_but_newest 175 365 $rootBackupDir/${bucketNames[6]}
+    __delete_all_but_newest 63 174 $rootBackupDir/${bucketNames[5]}
+    __delete_all_but_newest 35 62  $rootBackupDir/${bucketNames[4]}
+    __delete_all_but_newest 28 34 $rootBackupDir/${bucketNames[3]}
+    __delete_all_but_newest 21 27 $rootBackupDir/${bucketNames[2]}
+    __delete_all_but_newest 14 20 $rootBackupDir/${bucketNames[1]}
     if [ "$verbose" ==  true ]; then
       echo Pruning done.
     fi
@@ -258,12 +258,12 @@ function __move_dirs_to_bucket()
   done
 }
 
-## Routine that deletes all dirs from a bucket except for the ones with the oldest
+## Routine that deletes all dirs from a bucket except for the ones with the newest
 #  timestamp
 ## Takes two parameters:
 ##   older_than_n_days_ago
 ##   younger_than_n_days ago
-function __delete_all_but_oldest()
+function __delete_all_but_newest()
 {
   if [ -z "$1" ]                           # Is parameter #1 zero length?
   then
@@ -282,8 +282,8 @@ function __delete_all_but_oldest()
   local youngerThanN=${2-$DEFAULT}           
 
   # For each MM-DD-YY between the start and end dates and reverse chrono order
-  local foundOldest=false
-  for i in `seq $youngerThanN -1 $olderThanN`;
+  local foundNewest=false
+  for i in `seq $olderThanN 1 $youngerThanN`;
   do
     # Generate a date of the form MM-DD-YY
     iDate=$(date --date "$i days ago" +"%m-%d-%y")
@@ -300,15 +300,15 @@ function __delete_all_but_oldest()
       echo Found $c.
     fi
 
-    # If any such dirs exist, check if they correspond to the oldest timestamp.
+    # If any such dirs exist, check if they correspond to the newest timestamp.
     # If not, delete them
     if [ $c -ne 0 ]; then
-      if [ $foundOldest == false ] ; then
+      if [ $foundNewest == false ] ; then
         if [ "$verbose" ==  true ]; then
-          echo Oldest dir between [$olderThanN; $youngerThanN] is from $iDate. Not pruned.
+          echo Newest dir between [$olderThanN; $youngerThanN] is from $iDate. Not pruned.
         fi
 
-        foundOldest=true
+        foundNewest=true
       else
 
         local dirs=$( (find $rootBackupDir -type d -name "*$iDate*" -printf "%p ") 2>/dev/null )
