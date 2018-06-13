@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# Test script for rotate_backup
+# Test script for rotate_backup.sh
 #
 
 rootBackupDir="./BACKUP_TEST"
