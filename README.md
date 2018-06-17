@@ -14,6 +14,8 @@ When run, the script places all dirs in one of seven buckets based on the timest
 - 063-174--DAYS-AGO
 - 175-365--DAYS-AGO
 
+If '-p' flag is passed, we prune all buckets by deleting all backups except the oldest one in each bucket. We never prune the '000-013' directory.
+
 **All directories whose timestamps are older than 365 days, are deleted**.
 
 ### Usage

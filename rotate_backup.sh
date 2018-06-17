@@ -106,12 +106,12 @@ function main() {
     if [ "$verbose" ==  true ]; then
       echo Start pruning dirs...
     fi
-    __delete_all_but_newest 175 365 $rootBackupDir/${bucketNames[6]}
-    __delete_all_but_newest 63 174 $rootBackupDir/${bucketNames[5]}
-    __delete_all_but_newest 35 62  $rootBackupDir/${bucketNames[4]}
-    __delete_all_but_newest 28 34 $rootBackupDir/${bucketNames[3]}
-    __delete_all_but_newest 21 27 $rootBackupDir/${bucketNames[2]}
-    __delete_all_but_newest 14 20 $rootBackupDir/${bucketNames[1]}
+    __delete_all_but_oldest 175 365 $rootBackupDir/${bucketNames[6]}
+    __delete_all_but_oldest 63 174 $rootBackupDir/${bucketNames[5]}
+    __delete_all_but_oldest 35 62  $rootBackupDir/${bucketNames[4]}
+    __delete_all_but_oldest 28 34 $rootBackupDir/${bucketNames[3]}
+    __delete_all_but_oldest 21 27 $rootBackupDir/${bucketNames[2]}
+    __delete_all_but_oldest 14 20 $rootBackupDir/${bucketNames[1]}
     if [ "$verbose" ==  true ]; then
       echo Pruning done.
     fi
@@ -180,7 +180,7 @@ function __check_root_and_buckets_exist()
 
 ## Routine that moves a set of relevant dirs to their corresponding bucket
 ## The set of relevant dirs are all dirs whose names contain timestamps
-## found between two landmarks: [older_than_n_days_ago; yonger_than_n_days_ago]
+## found between two landmarks: [older_than_n_days_ago; younger_than_n_days_ago]
 ## Note: the landmarks are inclusive
 ##
 ## e.g., __move_dirs_to_bucket 1 2 _bucketName_
@@ -258,12 +258,12 @@ function __move_dirs_to_bucket()
   done
 }
 
-## Routine that deletes all dirs from a bucket except for the ones with the newest
+## Routine that deletes all dirs from a bucket except for the ones with the oldest
 #  timestamp
 ## Takes two parameters:
 ##   older_than_n_days_ago
 ##   younger_than_n_days ago
-function __delete_all_but_newest()
+function __delete_all_but_oldest()
 {
   if [ -z "$1" ]                           # Is parameter #1 zero length?
   then
@@ -281,9 +281,9 @@ function __delete_all_but_newest()
   local olderThanN=${1-$DEFAULT}          
   local youngerThanN=${2-$DEFAULT}           
 
-  # For each MM-DD-YY between the start and end dates and reverse chrono order
+  # For each MM-DD-YY between the start and end dates in chrono order
   local foundNewest=false
-  for i in `seq $olderThanN 1 $youngerThanN`;
+  for i in `seq $youngerThanN -1 $olderThanN`;
   do
     # Generate a date of the form MM-DD-YY
     iDate=$(date --date "$i days ago" +"%m-%d-%y")
