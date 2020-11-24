@@ -41,6 +41,8 @@ function usage()
   echo  "   -p: Prune buckets. (leave oldest dir in each bucket, except 000-014 bucket)"
   echo  "   -n: Shows a log of all actions. No actions are taken."
   echo  "   -v: Verbose mode."
+  echo  
+  echo  "Note: rootBackupDir should not end in a slash (e.g., /BACKUP not /BACKUP/)"
 } 
 
 # Main program
