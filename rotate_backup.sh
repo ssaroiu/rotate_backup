@@ -239,7 +239,7 @@ function __move_dirs_to_bucket()
       local dirs=$(find $rootBackupDir -path $bucket -prune -o -type d -name "*$iDate*" -printf "%p ")
 
       if [ "$verbose" ==  true ]; then
-        echo Moving all dirs to bucket $bucket...
+        echo Moving all dirs from day=$iDate to bucket $bucket...
       fi
 
       # Move the dirs
